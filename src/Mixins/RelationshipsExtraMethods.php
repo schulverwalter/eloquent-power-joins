@@ -18,6 +18,7 @@ use Illuminate\Database\MySqlConnection;
 use Illuminate\Support\Str;
 use Kirschbaum\PowerJoins\PowerJoinClause;
 use Kirschbaum\PowerJoins\StaticCache;
+use Staudenmeir\EloquentHasManyDeep\HasManyDeep;
 
 /**
  * @method \Illuminate\Database\Eloquent\Model getModel()
@@ -42,12 +43,15 @@ use Kirschbaum\PowerJoins\StaticCache;
  * @property \Illuminate\Database\Eloquent\Builder $query
  * @property Model $parent
  * @property Model $throughParent
+ * @property Model $throughParents
  * @property string $foreignKey
  * @property string $parentKey
  * @property string $ownerKey
  * @property string $localKey
+ * @property string $localKeys
  * @property string $secondKey
  * @property string $secondLocalKey
+ * @property string $foreignKeys
  * @property Model $farParent
  */
 class RelationshipsExtraMethods
@@ -64,6 +68,7 @@ class RelationshipsExtraMethods
                 $this instanceof MorphOneOrMany => $this->performJoinForEloquentPowerJoinsForMorph($builder, $joinType, $callback, $alias, $disableExtraConditions),
                 $this instanceof HasMany || $this instanceof HasOne => $this->performJoinForEloquentPowerJoinsForHasMany($builder, $joinType, $callback, $alias, $disableExtraConditions, $hasCheck),
                 $this instanceof HasManyThrough || $this instanceof HasOneThrough => $this->performJoinForEloquentPowerJoinsForHasManyThrough($builder, $joinType, $callback, $alias, $disableExtraConditions),
+                $this instanceof HasManyDeep => $this->performJoinForEloquentPowerJoinsForHasManyDeep($builder, $joinType, $callback, $alias, $disableExtraConditions),
                 $this instanceof MorphTo => $this->performJoinForEloquentPowerJoinsForMorphTo($builder, $joinType, $callback, $alias, $disableExtraConditions, $morphable),
                 default => $this->performJoinForEloquentPowerJoinsForBelongsTo($builder, $joinType, $callback, $alias, $disableExtraConditions),
             };
@@ -428,6 +433,70 @@ class RelationshipsExtraMethods
     }
 
     /**
+     * Perform the JOIN clause for HasManyDeep relationships.
+     * Based on join method in HasManyDeep.
+     * Composite keys are currently not supported.
+     */
+    protected function performJoinForEloquentPowerJoinsForHasManyDeep()
+    {
+        return function ($builder, $joinType, $callback = null, $alias = null, bool $disableExtraConditions = false) {
+
+            // throughParents are all tables like models and pivots between parent and related
+            $throughParents = $this->getThroughParents();
+            $foreignKeys = $this->getForeignKeys();
+            $localKeys = $this->getLocalKeys();
+
+            // the join has to be performed for all throughParents and for the related model
+            // the join itself is similar to HasManyThrough but with multiple levels
+            foreach ([...$throughParents, $this->related] as $i => $throughParent) {
+
+                $builder->{$joinType}($throughParent->getTable(), function (PowerJoinClause $join) use ($callback, $i, $throughParent, $throughParents, $foreignKeys, $localKeys, $alias, $disableExtraConditions) {
+                    
+                    $predecessor = $throughParents[$i-1] ?? $this->farParent;
+                    $predecessorTable = $alias[$i-1] ?? $predecessor->getTable();
+                    $currentTable = $alias[$i] ?? $throughParent->getTable();
+
+                    if (isset($alias[$i])) {
+                        $join->as($alias[$i]);
+                    }
+
+                    // manages morph relations
+                    if (is_array($localKeys[$i])) {
+                        $join->where($throughParent->qualifyColumn($localKeys[0]), '=', $predecessor->getMorphClass());
+                        $localKeys[$i] = $localKeys[$i][1];
+                    }
+                    if (is_array($foreignKeys[$i])) {
+                        $join->where($predecessor->qualifyColumn($foreignKeys[$i][0]), '=', $throughParent->getMorphClass());
+                        $foreignKeys[$i] = $foreignKeys[$i][1];
+                    }
+
+                    $join->on(
+                        $predecessorTable . '.' . $localKeys[$i],
+                        '=',
+                        $currentTable . '.' . $foreignKeys[$i]
+                    );
+
+                    if ($disableExtraConditions === false && $this->usesSoftDeletes($throughParent)) {
+                        $join->whereNull($throughParent->getQualifiedDeletedAtColumn());
+                    }
+    
+                    // applying any extra conditions to the belongs to many relationship
+                    if ($disableExtraConditions === false) {
+                        $this->applyExtraConditions($join);
+                    }
+    
+                    if (is_array($callback) && isset($callback[$throughParent->getTable()])) {
+                        $callback[$throughParent->getTable()]($join);
+                    }
+
+                }, $throughParent);
+                
+            }
+            return $this;
+        };
+    }
+
+    /**
      * Perform the "HAVING" clause for eloquent power joins.
      */
     public function performHavingForEloquentPowerJoins()
@@ -485,6 +554,36 @@ class RelationshipsExtraMethods
     {
         return function () {
             return $this->farParent;
+        };
+    }
+
+    /**
+     * Get the throughParent for the HasManyThrough relationship.
+     */
+    public function getThroughParents()
+    {
+        return function () {
+            return $this->throughParents;
+        };
+    }
+
+    /**
+     * Get the throughParent for the HasManyThrough relationship.
+     */
+    public function getLocalKeys()
+    {
+        return function () {
+            return $this->localKeys;
+        };
+    }
+
+    /**
+     * Get the throughParent for the HasManyThrough relationship.
+     */
+    public function getForeignKeys()
+    {
+        return function () {
+            return $this->foreignKeys;
         };
     }
 
@@ -575,6 +674,11 @@ class RelationshipsExtraMethods
 
             if ($this instanceof HasMany || $this instanceof HasOne) {
                 return $this->getExistenceCompareKey();
+            }
+
+            if ($this instanceof HasManyDeep) {
+                $foreignKeys = $this->getForeignKeys();
+                return $foreignKeys[0] ?? null;
             }
 
             if ($this instanceof HasManyThrough || $this instanceof HasOneThrough) {

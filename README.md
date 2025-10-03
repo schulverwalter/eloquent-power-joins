@@ -17,6 +17,8 @@ A few things we consider is missing when using joins which are very powerful Elo
 * Ability to query relationship existence using joins instead of where exists;
 * Ability to easily sort results based on columns or aggregations from related tables;
 
+Supports also `staudenmeir/eloquent-has-many-deep` relations.
+
 You can read a more detailed explanation on the problems this package solves on [this blog post](https://kirschbaumdevelopment.com/insights/power-joins).
 
 ## Installation

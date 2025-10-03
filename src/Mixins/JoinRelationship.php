@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Kirschbaum\PowerJoins\JoinsHelper;
 use Kirschbaum\PowerJoins\PowerJoinClause;
 use Kirschbaum\PowerJoins\StaticCache;
+use Staudenmeir\EloquentHasManyDeep\HasManyDeep;
 
 /**
  * @mixin Builder
@@ -153,6 +154,25 @@ class JoinRelationship
                     $relationCallback
                 );
                 $alias = [$extraAlias, $alias];
+            }
+
+            // Needs as many unique aliases as there are tables in the relation (excluding parent table)
+            if ($relation instanceof HasManyDeep) {
+                if (!is_array($alias)) {
+                    $alias = [$alias];
+                }
+                // through parents plus related
+                $countRequired = count($relation->getThroughParents()) + 1;
+
+                if (count($alias) < $countRequired) {
+                    for ($i = count($alias); $i < $countRequired; $i++) { 
+                        if ($useAlias) {
+                            $alias[] = md5($relationName . $i . time());
+                        } else {
+                            $alias[] = null;
+                        }
+                    }
+                }
             }
 
             $aliasString = is_array($alias) ? implode('.', $alias) : $alias;
