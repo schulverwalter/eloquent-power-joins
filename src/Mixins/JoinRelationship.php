@@ -165,9 +165,9 @@ class JoinRelationship
                 $countRequired = count($relation->getThroughParents()) + 1;
 
                 if (count($alias) < $countRequired) {
-                    for ($i = count($alias); $i < $countRequired; $i++) { 
+                    for ($i = count($alias); $i < $countRequired; ++$i) {
                         if ($useAlias) {
-                            $alias[] = md5($relationName . $i . time());
+                            $alias[] = md5($relationName.$i.time());
                         } else {
                             $alias[] = null;
                         }

@@ -67,8 +67,8 @@ class RelationshipsExtraMethods
                 $this instanceof BelongsToMany => $this->performJoinForEloquentPowerJoinsForBelongsToMany($builder, $joinType, $callback, $alias, $disableExtraConditions),
                 $this instanceof MorphOneOrMany => $this->performJoinForEloquentPowerJoinsForMorph($builder, $joinType, $callback, $alias, $disableExtraConditions),
                 $this instanceof HasMany || $this instanceof HasOne => $this->performJoinForEloquentPowerJoinsForHasMany($builder, $joinType, $callback, $alias, $disableExtraConditions, $hasCheck),
-                $this instanceof HasManyThrough || $this instanceof HasOneThrough => $this->performJoinForEloquentPowerJoinsForHasManyThrough($builder, $joinType, $callback, $alias, $disableExtraConditions),
                 $this instanceof HasManyDeep => $this->performJoinForEloquentPowerJoinsForHasManyDeep($builder, $joinType, $callback, $alias, $disableExtraConditions),
+                $this instanceof HasManyThrough || $this instanceof HasOneThrough => $this->performJoinForEloquentPowerJoinsForHasManyThrough($builder, $joinType, $callback, $alias, $disableExtraConditions),
                 $this instanceof MorphTo => $this->performJoinForEloquentPowerJoinsForMorphTo($builder, $joinType, $callback, $alias, $disableExtraConditions, $morphable),
                 default => $this->performJoinForEloquentPowerJoinsForBelongsTo($builder, $joinType, $callback, $alias, $disableExtraConditions),
             };
@@ -440,7 +440,6 @@ class RelationshipsExtraMethods
     protected function performJoinForEloquentPowerJoinsForHasManyDeep()
     {
         return function ($builder, $joinType, $callback = null, $alias = null, bool $disableExtraConditions = false) {
-
             // throughParents are all tables like models and pivots between parent and related
             $throughParents = $this->getThroughParents();
             $foreignKeys = $this->getForeignKeys();
@@ -449,11 +448,9 @@ class RelationshipsExtraMethods
             // the join has to be performed for all throughParents and for the related model
             // the join itself is similar to HasManyThrough but with multiple levels
             foreach ([...$throughParents, $this->related] as $i => $throughParent) {
-
                 $builder->{$joinType}($throughParent->getTable(), function (PowerJoinClause $join) use ($callback, $i, $throughParent, $throughParents, $foreignKeys, $localKeys, $alias, $disableExtraConditions) {
-                    
-                    $predecessor = $throughParents[$i-1] ?? $this->farParent;
-                    $predecessorTable = $alias[$i-1] ?? $predecessor->getTable();
+                    $predecessor = $throughParents[$i - 1] ?? $this->farParent;
+                    $predecessorTable = $alias[$i - 1] ?? $predecessor->getTable();
                     $currentTable = $alias[$i] ?? $throughParent->getTable();
 
                     if (isset($alias[$i])) {
@@ -471,27 +468,26 @@ class RelationshipsExtraMethods
                     }
 
                     $join->on(
-                        $predecessorTable . '.' . $localKeys[$i],
+                        $predecessorTable.'.'.$localKeys[$i],
                         '=',
-                        $currentTable . '.' . $foreignKeys[$i]
+                        $currentTable.'.'.$foreignKeys[$i]
                     );
 
                     if ($disableExtraConditions === false && $this->usesSoftDeletes($throughParent)) {
                         $join->whereNull($throughParent->getQualifiedDeletedAtColumn());
                     }
-    
+
                     // applying any extra conditions to the belongs to many relationship
                     if ($disableExtraConditions === false) {
                         $this->applyExtraConditions($join);
                     }
-    
+
                     if (is_array($callback) && isset($callback[$throughParent->getTable()])) {
                         $callback[$throughParent->getTable()]($join);
                     }
-
                 }, $throughParent);
-                
             }
+
             return $this;
         };
     }
@@ -677,8 +673,7 @@ class RelationshipsExtraMethods
             }
 
             if ($this instanceof HasManyDeep) {
-                $foreignKeys = $this->getForeignKeys();
-                return $foreignKeys[0] ?? null;
+                return $this->getQualifiedFirstKeyName();
             }
 
             if ($this instanceof HasManyThrough || $this instanceof HasOneThrough) {
