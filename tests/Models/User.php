@@ -9,9 +9,12 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Staudenmeir\EloquentHasManyDeep\HasManyDeep;
+use Staudenmeir\EloquentHasManyDeep\HasRelationships;
 
 class User extends Model
 {
+    use HasRelationships;
     use SoftDeletes;
 
     /** @var string */
@@ -71,6 +74,22 @@ class User extends Model
     public function postsThroughComments(): HasManyThrough
     {
         return $this->hasManyThrough(Post::class, Comment::class);
+    }
+
+    /**
+     * Deep relationship spanning users -> posts -> comments.
+     */
+    public function commentsThroughPostsDeep(): HasManyDeep
+    {
+        return $this->hasManyDeepFromRelations($this->posts(), (new Post())->comments());
+    }
+
+    /**
+     * Deep relationship spanning users -> posts -> post_groups (pivot) -> groups.
+     */
+    public function groupsThroughPostsDeep(): HasManyDeep
+    {
+        return $this->hasManyDeepFromRelations($this->posts(), (new Post())->groups());
     }
 
     public function images(): MorphMany

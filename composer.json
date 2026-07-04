@@ -26,7 +26,11 @@
         "friendsofphp/php-cs-fixer": "dev-master",
         "laravel/legacy-factories": "^1.0@dev|dev-master",
         "orchestra/testbench": "^9.0|^10.0|^11.0",
-        "phpunit/phpunit": "^10.0|^11.0|^12.0"
+        "phpunit/phpunit": "^10.0|^11.0|^12.0",
+        "staudenmeir/eloquent-has-many-deep": "^1.22"
+    },
+    "suggest": {
+        "staudenmeir/eloquent-has-many-deep": "Required to use power joins with `HasManyDeep` relationships (^1.22)."
     },
     "autoload": {
         "psr-4": {
